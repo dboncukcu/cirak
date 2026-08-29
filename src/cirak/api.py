@@ -69,7 +69,7 @@ def load_plugins(paths) -> list[Problem]:
     return [*load_problems, *merge_problems, *plugin_problems]
 
 
-def run(paths, *, record_dir=None, executor="seri", workers=None):
+def run(paths, *, record_dir=None, executor="serial", workers=None):
     analysis = analyze(paths)
     gate(analysis.problems)
     if not isinstance(analysis.data.get("flow"), dict):

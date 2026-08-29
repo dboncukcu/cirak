@@ -70,7 +70,7 @@ def _parser() -> argparse.ArgumentParser:
     run_cmd = commands.add_parser("run", help="compile and run on tezgah")
     run_cmd.add_argument("paths", nargs="+")
     run_cmd.add_argument("--record", help="directory for resolved.yaml and tezgah records")
-    run_cmd.add_argument("--executor", default="seri")
+    run_cmd.add_argument("--executor", default="serial")
     run_cmd.add_argument("--workers", type=int)
     run_cmd.set_defaults(handler=_cmd_run)
 

@@ -463,10 +463,10 @@ register_fragment(uri, path, *, description)
 register_std(registry)
 check(paths) -> list[Problem]
 resolve(paths) -> dict
-run(paths, *, record_dir=None, executor="seri", workers=None) -> tezgah.Report
+run(paths, *, record_dir=None, executor="serial", workers=None) -> tezgah.Report
 ```
 
-`check` returns findings without raising. `resolve` returns the resolved recipe and raises `ConfigError` on errors. `run` compiles, builds, and executes on tezgah; `executor` accepts tezgah's `"seri"`, `"thread"` and `"dask"`. The command line is a thin shell over these functions.
+`check` returns findings without raising. `resolve` returns the resolved recipe and raises `ConfigError` on errors. `run` compiles, builds, and executes on tezgah; `executor` accepts tezgah's `"serial"`, `"thread"` and `"dask"`. The command line is a thin shell over these functions.
 
 ## Development
 
