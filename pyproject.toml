@@ -1,0 +1,36 @@
+[project]
+name = "cirak"
+version = "0.1.0"
+description = "YAML recipe compiler: resolves registered building blocks into Python objects and tezgah pipelines"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "dboncukcu" }]
+requires-python = ">=3.13"
+keywords = ["yaml", "config", "pipeline", "registry", "compiler", "tezgah"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "tezgah",
+    "ruamel.yaml>=0.18",
+]
+
+[project.urls]
+Repository = "https://github.com/dboncukcu/cirak"
+
+[project.scripts]
+cirak = "cirak.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
