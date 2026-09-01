@@ -140,7 +140,7 @@ flow:
     loop:
       carry: {x: seed}
       until: /num/flow/big
-      max_iter: 10
+      range: 10
       trace: {x: history}
       outputs: {x: final}
       body:
@@ -150,6 +150,33 @@ flow:
 """)
     report = run([path])
     assert report.outputs == {"final": 3, "history": [1, 2, 3]}
+
+
+def test_loop_range_index_passthrough(write):
+    def hold(value):
+        return value
+
+    def add(x, turn):
+        return x + turn
+
+    register("/num/flow/hold", hold, description="d")
+    register("/num/flow/add_turn", add, description="d")
+    path = write("a.yaml", """
+flow:
+  outputs: [final]
+  seed: {uri: /num/flow/hold, params: {value: 0}, outputs: [seed]}
+  grow:
+    loop:
+      carry: {x: seed}
+      range: [1, 4]
+      index: turn
+      outputs: {x: final}
+      body:
+        inputs: [x, turn]
+        outputs: {x_next: x}
+        add: {uri: /num/flow/add_turn, inputs: {x: x, turn: turn}, outputs: [x_next]}
+""")
+    assert run([path]).outputs == {"final": 6}
 
 
 def test_when_skips_side_effect(write):

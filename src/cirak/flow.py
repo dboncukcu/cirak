@@ -43,8 +43,9 @@ def _node(spec, name, store, registry):
         inside = spec["loop"]
         return Loop(body=_body(inside, name, "loop", store, registry),
                     carry=inside.get("carry"),
+                    range=inside.get("range"),
+                    index=inside.get("index"),
                     until=_condition(inside.get("until"), store, registry),
-                    max_iter=inside.get("max_iter"),
                     trace=inside.get("trace"),
                     outputs=inside.get("outputs"),
                     name=name,

@@ -332,7 +332,7 @@ node := step | pipeline | map | loop | branch
 step:      {uri, params?, inputs?, outputs?, when?, wait_for?, retries?, wait?}
 pipeline:  {<name>: node, ..., inputs?, outputs?, wait_for?}
 map:       {map: {body: node, over, item?, index?, collect?, parallel?, wait_for?}}
-loop:      {loop: {body: node, carry, max_iter, until?, trace?, outputs?, wait_for?}}
+loop:      {loop: {body: node, carry, range, index?, until?, trace?, outputs?, wait_for?}}
 branch:    {branch: {decide, inputs?, cases: {<label>: node, ...}, default?, wait_for?}}
 ```
 
@@ -354,7 +354,7 @@ flow:
         false: {uri: /num/demo/triple, inputs: [n], outputs: [next]}
 ```
 
-Map and loop follow tezgah's semantics exactly: map collects in input order no matter what finishes first, loop turns are sequential with carried state and a mandatory `max_iter`:
+Map and loop follow tezgah's semantics exactly: map collects in input order no matter what finishes first, loop turns are sequential with carried state over a mandatory `range` (Python semantics: an int, `[start, stop]` or `[start, stop, step]`); the optional `index` names the wire that carries the current range value into the body, so `range: [1, 81]` with `index: epoch` reads like `for epoch in range(1, 81)`:
 
 ```yaml
   fan:
@@ -369,7 +369,7 @@ Map and loop follow tezgah's semantics exactly: map collects in input order no m
     loop:
       carry: {value: seed}
       until: /num/demo/converged
-      max_iter: 100
+      range: 100
       trace: {error: error_history}
       outputs: {value: best}
       body:
