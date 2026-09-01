@@ -1,7 +1,7 @@
 from .errors import Problem, dotted, error
 from .resolve import fill
 
-RESERVED = ("include", "plugins", "alias", "params", "blocks", "flow")
+RESERVED = ("include", "plugins", "alias", "params", "blocks", "setup", "flow")
 
 
 def components(data: dict) -> list[tuple[tuple, dict]]:

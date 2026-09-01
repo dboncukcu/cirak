@@ -1,6 +1,6 @@
 [project]
 name = "cirak"
-version = "0.1.1"
+version = "0.1.2"
 description = "YAML recipe compiler: resolves registered building blocks into Python objects and tezgah pipelines"
 readme = "README.md"
 license = "MIT"

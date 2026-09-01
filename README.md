@@ -25,6 +25,7 @@ The names follow the Turkish guild tradition. The tezgah is the workbench. The �
 - [Blocks](#blocks)
 - [Builders](#builders)
 - [Flow](#flow)
+- [Setup](#setup)
 - [Strict merging and variants](#strict-merging-and-variants)
 - [Validation](#validation)
 - [Error model](#error-model)
@@ -169,7 +170,7 @@ cirak run runs/first/resolved.yaml
 | fragment | A registered YAML piece that recipes can include by URI |
 | problem | One finding: severity, kind, message, file, line, hint |
 
-A recipe has exactly six reserved top level keys: `include`, `plugins`, `alias`, `params`, `blocks`, `flow`. Every other top level key is a component or a group of components. çırak recognizes no section names beyond the six; `metrics:` or `tools:` are just names you chose.
+A recipe has exactly seven reserved top level keys: `include`, `plugins`, `alias`, `params`, `blocks`, `setup`, `flow`. Every other top level key is a component or a group of components. çırak recognizes no section names beyond the seven; `metrics:` or `tools:` are just names you chose.
 
 ## The registry
 
@@ -378,6 +379,27 @@ Map and loop follow tezgah's semantics exactly: map collects in input order no m
 ```
 
 Before running, çırak also executes tezgah's own static validation on the compiled pipeline and surfaces its findings as regular problems with recipe locations attached.
+
+## Setup
+
+`setup:` is an optional list of registered callables that `cirak run` invokes **before any
+component is built**, in order:
+
+```yaml
+setup:
+  - {uri: /util/proj/seed_everything, params: {seed: 42}}
+```
+
+It exists for process level preparation that must precede construction: seeding random number
+generators is the canonical case, since component factories may draw random state the moment they
+are built (a neural network layer initializing its weights, for example). Placing the seeding in
+`flow:` alone is too late for those draws; placing it in `setup:` as well as in the flow pins both
+construction time and run time behavior.
+
+Setup entries take only `uri` and `params`, and the params are plain values: `$param$`
+substitution applies as everywhere, but `@component` references are rejected at validation,
+because components do not exist yet when setup runs. The signature check applies to setup entries
+like any component. `cirak check` validates the section without running it.
 
 ## Strict merging and variants
 

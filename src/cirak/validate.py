@@ -12,6 +12,7 @@ STEP_ONLY_FIELDS = ("params", "when", "retries", "wait")
 
 def validate(data: dict, provenance: dict, expansions: dict, registry=None) -> list[Problem]:
     problems: list[Problem] = []
+    _check_setup(data, provenance, problems)
     _check_components(data, provenance, problems)
     _check_blocks(data, provenance, problems)
     _check_graphs(data, provenance, expansions, problems)
@@ -21,6 +22,36 @@ def validate(data: dict, provenance: dict, expansions: dict, registry=None) -> l
         _check_uris(data, provenance, registry, problems)
         _check_signatures(data, provenance, expansions, registry, problems)
     return problems
+
+
+def _check_setup(data, provenance, problems) -> None:
+    setup = data.get("setup")
+    if setup is None:
+        return
+    if not isinstance(setup, list):
+        problems.append(error("invalid_setup", "setup must be a list of steps",
+                              provenance.get(("setup",))))
+        return
+    for index, step in enumerate(setup):
+        source = provenance.get(("setup", index))
+        if not isinstance(step, dict) or not isinstance(step.get("uri"), str):
+            problems.append(error("invalid_setup",
+                                  f"setup[{index}] must be a mapping with a uri", source))
+            continue
+        params = step.get("params")
+        if params is not None and not isinstance(params, dict):
+            problems.append(error("invalid_setup",
+                                  f"params of setup[{index}] must be a mapping", source))
+        unknown = [key for key in step if key not in ("uri", "params")]
+        if unknown:
+            problems.append(error("invalid_setup",
+                                  f"setup[{index}] has unknown keys {unknown}", source))
+        for ref, ref_path in _refs(params if isinstance(params, dict) else {},
+                                   ("setup", index, "params")):
+            problems.append(error("invalid_setup",
+                                  f"@{ref} is not available in setup: components are built "
+                                  f"after setup runs (at {dotted(ref_path)})",
+                                  provenance.get(ref_path)))
 
 
 def _check_components(data, provenance, problems) -> None:
@@ -340,6 +371,13 @@ def _check_signatures(data, provenance, expansions, registry, problems) -> None:
     for key, graph in expansions.items():
         for node in graph["graph"].values():
             targets.append((node["uri"], node["params"], node["partial"], paths.get(key, ())))
+    setup = data.get("setup")
+    if isinstance(setup, list):
+        for index, step in enumerate(setup):
+            if isinstance(step, dict) and isinstance(step.get("uri"), str):
+                params = step.get("params")
+                params = params if isinstance(params, dict) else {}
+                targets.append((step["uri"], params, False, ("setup", index)))
     for uri, params, partial, path in targets:
         target = registry.resolve_quietly(uri)
         if target is None:

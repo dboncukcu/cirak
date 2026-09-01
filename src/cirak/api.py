@@ -74,6 +74,7 @@ def run(paths, *, record_dir=None, executor="serial", workers=None):
     gate(analysis.problems)
     if not isinstance(analysis.data.get("flow"), dict):
         raise CirakError("recipe has no flow section to run")
+    _run_setup(analysis.data, global_registry)
     store = build_components(analysis.data, analysis.expansions, global_registry)
     pipeline = compile_flow(analysis.data, store, global_registry)
     try:
@@ -84,6 +85,23 @@ def run(paths, *, record_dir=None, executor="serial", workers=None):
         _write_resolved(analysis.data, record_dir)
     return tezgah_run(pipeline, inputs=None, executor=executor, workers=workers,
                       record_dir=record_dir)
+
+
+def _run_setup(data, registry) -> None:
+    for step in data.get("setup") or []:
+        params = step.get("params")
+        params = _plain_params(params) if isinstance(params, dict) else {}
+        registry.resolve(step["uri"])(**params)
+
+
+def _plain_params(value):
+    if isinstance(value, dict):
+        return {key: _plain_params(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_plain_params(item) for item in value]
+    if isinstance(value, str) and value.startswith("@@"):
+        return value[1:]
+    return value
 
 
 def gate(problems) -> None:
