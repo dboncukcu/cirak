@@ -3,6 +3,9 @@ import pytest
 from cirak.registry import registry
 from cirak.std import register_std
 
+KINDS = ("source", "split", "pre", "feed", "loader", "layer", "init", "criterion", "objective", "metric",
+         "adapter", "optimizer", "schedule", "turn", "trigger", "checkpoint", "rule", "generate", "plot", "lego")
+
 CATALOG = [
     "/a/b/c",
     "/a/b/d",
@@ -29,14 +32,17 @@ def anything(*args, **kwargs):
 def catalog():
     saved_entries = dict(registry._entries)
     saved_resolved = dict(registry._resolved)
+    saved_kinds = list(registry._kinds)
     registry._entries.clear()
     registry._resolved.clear()
+    registry.declare_kinds(*KINDS)
     for uri in CATALOG:
         registry.register(uri, anything, description="test catalog target")
     register_std(registry)
     yield registry
     registry._entries.clear()
     registry._resolved.clear()
+    registry._kinds[:] = saved_kinds
     registry._entries.update(saved_entries)
     registry._resolved.update(saved_resolved)
 

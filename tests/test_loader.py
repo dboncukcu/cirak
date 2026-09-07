@@ -1,4 +1,9 @@
-from cirak.loader import load
+from cirak.loader import load as load_tree
+
+
+def load(paths, fragments=None):
+    layer, problems = load_tree(paths, fragments)
+    return list(layer.walk()), problems
 
 
 def kinds(problems):

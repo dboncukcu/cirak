@@ -1,5 +1,5 @@
 from cirak.loader import load
-from cirak.merge import merge
+from cirak.merge import merge_layers
 from cirak.resolve import resolve
 
 
@@ -8,9 +8,9 @@ def kinds(problems):
 
 
 def resolved(paths):
-    files, load_problems = load(paths)
+    layer, load_problems = load(paths)
     assert load_problems == []
-    data, provenance, merge_problems = merge(files)
+    data, provenance, _, merge_problems = merge_layers(layer)
     assert merge_problems == []
     return resolve(data, provenance)
 

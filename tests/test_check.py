@@ -80,3 +80,26 @@ def test_variant_selection_by_file(write):
     assert two["flow"]["work"]["uri"] == "/series/statlib/savgol"
     both = check([base, fast, precise])
     assert [problem.kind for problem in both] == ["merge_conflict"]
+
+
+def test_empty_top_level_section_is_an_empty_group(write):
+    from cirak import lego, run
+
+    lego("/t/check/take", lambda plots, metrics: (dict(plots), dict(metrics)))
+    path = write("a.yaml", """
+plots: {}
+metrics:
+  rmse: {uri: /a/b/c, partial: true}
+flow:
+  outputs: [taken]
+  take: {uri: /t/check/take, params: {plots: "@plots", metrics: "@metrics"}, outputs: [taken]}
+""")
+    assert check([path]) == []
+    plots, metrics = run([path]).outputs["taken"]
+    assert plots == {}
+    assert list(metrics) == ["rmse"]
+    missing = write("b.yaml", """
+flow:
+  take: {uri: /t/check/take, params: {plots: "@plots", metrics: "@nothing"}, outputs: []}
+""")
+    assert [problem.kind for problem in check([missing])] == ["unknown_reference", "unknown_reference"]

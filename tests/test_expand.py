@@ -1,6 +1,6 @@
 from cirak.expand import expand
 from cirak.loader import load
-from cirak.merge import merge
+from cirak.merge import merge_layers
 from cirak.resolve import resolve
 
 
@@ -9,8 +9,8 @@ def kinds(problems):
 
 
 def expanded(paths):
-    files, load_problems = load(paths)
-    data, provenance, merge_problems = merge(files)
+    layer, load_problems = load(paths)
+    data, provenance, _, merge_problems = merge_layers(layer)
     data, resolve_problems = resolve(data, provenance)
     assert load_problems == merge_problems == resolve_problems == []
     return expand(data, provenance)
@@ -139,17 +139,21 @@ def test_unknown_block(write):
     assert kinds(problems) == ["unknown_block"]
 
 
-def test_repeat_forbidden_in_graph(write):
+def test_repeat_in_graph_chains_copies(write):
     path = write("a.yaml", """
 blocks:
-  bad:
+  deep:
     inputs: [x]
     outputs: [y]
     graph:
       y: {uri: /a/b/c, partial: true, inputs: x, repeat: 2}
 c:
-  block: bad
+  block: deep
   builder: /b/p/x
 """)
     expansions, problems = expanded([path])
-    assert kinds(problems) == ["invalid_block"]
+    assert problems == []
+    graph = expansions["c"]["graph"]
+    assert list(graph) == ["y_0", "y_1"]
+    assert graph["y_0"]["inputs"] == ["x"] and graph["y_0"]["outputs"] == ["y_0"]
+    assert graph["y_1"]["inputs"] == ["y_0"] and graph["y_1"]["outputs"] == ["y"]

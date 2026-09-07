@@ -1,5 +1,5 @@
 from cirak.loader import load
-from cirak.merge import merge
+from cirak.merge import merge_layers
 
 
 def kinds(problems):
@@ -7,9 +7,10 @@ def kinds(problems):
 
 
 def merged(paths):
-    files, problems = load(paths)
+    layer, problems = load(paths)
     assert problems == []
-    return merge(files)
+    data, provenance, _, merge_problems = merge_layers(layer)
+    return data, provenance, merge_problems
 
 
 def test_disjoint_merge(write):

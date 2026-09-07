@@ -111,7 +111,7 @@ flow:
     map:
       over: xs
       item: item
-      collect: doubled
+      collect: {y: doubled}
       parallel: 2
       body: {uri: /num/flow/double, inputs: [item], outputs: [y]}
 """)
@@ -139,7 +139,7 @@ flow:
   climb:
     loop:
       carry: {x: seed}
-      until: /num/flow/big
+      until: {uri: /num/flow/big}
       range: 10
       trace: {x: history}
       outputs: {x: final}
@@ -201,25 +201,27 @@ flow:
     uri: /num/flow/shout
     inputs: [n]
     outputs: []
-    when: /num/flow/over_five
+    when: {uri: /num/flow/over_five}
 """)
     run([path])
     assert calls == []
 
 
 def test_tezgah_validation_surfaces_as_config_error(write):
-    def consume(missing_key):
-        return missing_key
+    def consume(key):
+        return key
 
     register("/num/flow/consume", consume, description="d")
     path = write("a.yaml",
                  "flow:\n  outputs: [out2]\n"
-                 "  bad: {uri: /num/flow/consume, inputs: [missing_key], outputs: [out2]}\n")
+                 "  one: {uri: /num/flow/consume, inputs: {key: seed}, outputs: [out2]}\n"
+                 "  two: {uri: /num/flow/consume, inputs: {key: seed}, outputs: [out2]}\n")
     with pytest.raises(ConfigError) as caught:
-        run([path])
+        run([path], inputs={"seed": 1})
     found = [problem for problem in caught.value.problems if problem.kind == "tezgah_validation"]
     assert found
     assert found[0].file is not None
+    assert [problem.kind for problem in check([path], inputs=["seed"])] == ["tezgah_validation"]
 
 
 def test_run_writes_resolved_and_rerun_matches(write, tmp_path):
@@ -248,3 +250,48 @@ flow:
     assert (record / "run.json").exists()
     rerun = run([str(record / "resolved.yaml")])
     assert rerun.outputs == report.outputs
+
+
+def test_unpack_picks_mapping_keys_by_name(write):
+    def divmod4(value):
+        return {"q": value // 4, "r": value % 4}
+
+    register("/num/flow/divmod4", divmod4, description="d")
+    path = write("a.yaml", """
+flow:
+  outputs: [q, r, pair]
+  seed: {uri: /num/flow/eleven, outputs: [value]}
+  split: {uri: /num/flow/divmod4, inputs: [value], outputs: [q, r], unpack: true}
+  whole: {uri: /num/flow/divmod4, inputs: [value], outputs: [pair]}
+""")
+    register("/num/flow/eleven", lambda: 11, description="d")
+    assert run([path]).outputs == {"q": 2, "r": 3, "pair": {"q": 2, "r": 3}}
+
+
+def test_several_outputs_without_unpack_is_a_config_error(write):
+    register("/num/flow/divmod4b", lambda value: {"q": 1, "r": 2}, description="d")
+    path = write("a.yaml", """
+flow:
+  outputs: [q, r]
+  seed: {uri: /num/flow/eleven_b, outputs: [value]}
+  split: {uri: /num/flow/divmod4b, inputs: [value], outputs: [q, r]}
+""")
+    register("/num/flow/eleven_b", lambda: 11, description="d")
+    problems = check([path])
+    assert [problem.kind for problem in problems] == ["needs_unpack"]
+
+
+def test_omitted_inputs_bind_required_parameters_from_the_bus(write):
+    def total(numbers, offset=10, scale=1):
+        return (sum(numbers) + offset) * scale
+
+    register("/num/flow/items2", lambda: [1, 2, 3], description="d")
+    register("/num/flow/total2", total, description="d")
+    path = write("a.yaml", """
+flow:
+  outputs: [grand]
+  feed: {uri: /num/flow/items2, outputs: [numbers]}
+  total: {uri: /num/flow/total2, params: {scale: 2}, outputs: [grand]}
+""")
+    assert check([path]) == []
+    assert run([path]).outputs == {"grand": 32}

@@ -6,9 +6,10 @@ from importlib.metadata import entry_points
 from ruamel.yaml import YAML
 from tezgah import TezgahError
 
-from .api import analyze, check, load_plugins
+from .api import analyze, check, flow_dump, layers, load_plugins
 from .api import run as run_recipe
 from .errors import CirakError, ConfigError
+from .loader import parse_value
 from .registry import registry
 
 
@@ -59,17 +60,30 @@ def _parser() -> argparse.ArgumentParser:
 
     check_cmd = commands.add_parser("check", help="compile and report every problem")
     check_cmd.add_argument("paths", nargs="+")
+    _recipe_options(check_cmd)
+    check_cmd.add_argument("--input", action="append", default=[], metavar="NAME",
+                           help="a root bus key run will be given; repeatable")
+    check_cmd.add_argument("--layers", action="store_true",
+                           help="print the layer tree and the leaves each file overrides")
     check_cmd.set_defaults(handler=_cmd_check)
 
     show_cmd = commands.add_parser("show", help="print the resolved recipe")
     show_cmd.add_argument("paths", nargs="+")
+    _recipe_options(show_cmd)
     show_cmd.add_argument("--expanded", action="store_true",
                           help="also print expanded block graphs")
+    show_cmd.add_argument("--flow", action="store_true",
+                          help="print the expanded flow instead, annotated with what tezgah resolved")
+    show_cmd.add_argument("--input", action="append", default=[], metavar="NAME",
+                          help="a root bus key run will be given (with --flow); repeatable")
     show_cmd.set_defaults(handler=_cmd_show)
 
     run_cmd = commands.add_parser("run", help="compile and run on tezgah")
     run_cmd.add_argument("paths", nargs="+")
-    run_cmd.add_argument("--record", help="directory for resolved.yaml and tezgah records")
+    _recipe_options(run_cmd)
+    run_cmd.add_argument("--input", action="append", default=[], metavar="NAME=VALUE",
+                         help="a root bus key and its YAML value; repeatable")
+    run_cmd.add_argument("--record", help="directory for resolved.yaml, flow.yaml and tezgah records")
     run_cmd.add_argument("--executor", default="serial")
     run_cmd.add_argument("--workers", type=int)
     run_cmd.set_defaults(handler=_cmd_run)
@@ -78,6 +92,7 @@ def _parser() -> argparse.ArgumentParser:
     ls_cmd.add_argument("prefix", nargs="?", default="/")
     ls_cmd.add_argument("--recipe", action="append", default=[], metavar="PATH",
                         help="load this recipe's plugins before listing")
+    ls_cmd.add_argument("--kind", help="only legos of this kind")
     ls_cmd.set_defaults(handler=_cmd_ls)
 
     search_cmd = commands.add_parser("search", help="search uris and descriptions")
@@ -89,8 +104,44 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _recipe_options(command) -> None:
+    command.add_argument("--set", action="append", default=[], metavar="PATH=VALUE",
+                         help="override a leaf as the top layer; the value is read as YAML; repeatable")
+
+
+def _sets(args):
+    found = []
+    for text in args.set:
+        path, separator, value = text.partition("=")
+        if not separator or not path:
+            raise SystemExit(_usage(f"--set expects PATH=VALUE, got {text!r}"))
+        found.append((path, parse_value(value)))
+    return found
+
+
+def _input_names(args):
+    return [text.partition("=")[0] for text in args.input]
+
+
+def _input_values(args):
+    found = {}
+    for text in args.input:
+        name, separator, value = text.partition("=")
+        if not separator or not name:
+            raise SystemExit(_usage(f"--input expects NAME=VALUE, got {text!r}"))
+        found[name] = parse_value(value)
+    return found
+
+
+def _usage(message) -> int:
+    print(f"cirak: error: {message}", file=sys.stderr)
+    return 2
+
+
 def _cmd_check(args) -> int:
-    problems = check(args.paths)
+    if args.layers:
+        print(layers(args.paths, sets=_sets(args)))
+    problems = check(args.paths, sets=_sets(args), inputs=_input_names(args))
     if not problems:
         style = _style_for(sys.stdout)
         print(style.green("no problems found"))
@@ -100,7 +151,17 @@ def _cmd_check(args) -> int:
 
 
 def _cmd_show(args) -> int:
-    analysis = analyze(args.paths)
+    if args.flow:
+        try:
+            sys.stdout.write(flow_dump(args.paths, sets=_sets(args), inputs=_input_names(args)))
+        except ConfigError as exc:
+            _print_problems(exc.problems, sys.stderr)
+            return 1
+        except CirakError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        return 0
+    analysis = analyze(args.paths, _sets(args))
     failures = [problem for problem in analysis.problems if problem.severity == "error"]
     if failures:
         _print_problems(failures, sys.stderr)
@@ -115,7 +176,7 @@ def _cmd_show(args) -> int:
 
 def _cmd_run(args) -> int:
     try:
-        report = run_recipe(args.paths, record_dir=args.record,
+        report = run_recipe(args.paths, sets=_sets(args), inputs=_input_values(args), record_dir=args.record,
                             executor=args.executor, workers=args.workers)
     except ConfigError as exc:
         _print_problems(exc.problems, sys.stderr)
@@ -135,7 +196,7 @@ def _cmd_run(args) -> int:
 
 def _cmd_ls(args) -> int:
     _load_recipe_plugins(args.recipe)
-    _print_entries(registry.ls(args.prefix))
+    _print_entries(registry.ls(args.prefix, kind=args.kind))
     return 0
 
 
@@ -165,8 +226,26 @@ def _print_entries(entries) -> None:
         print(style.dim("nothing found"))
         return
     width = max(len(entry.uri) for entry in entries)
-    for entry in entries:
-        print(f"{style.cyan(entry.uri.ljust(width))}  {style.dim(entry.description)}")
+    kinds = [entry.facts.kind or ("fragment" if entry.fragment else "") for entry in entries]
+    kind_width = max(len(kind) for kind in kinds)
+    for entry, kind in zip(entries, kinds):
+        line = f"{style.cyan(entry.uri.ljust(width))}  {style.yellow(kind.ljust(kind_width))}  {style.dim(entry.description)}"
+        facts = {name: value for name, value in entry.facts.declared().items() if name != "kind"}
+        if facts:
+            line += "  " + style.dim(_facts_text(facts))
+        print(line)
+
+
+def _facts_text(facts) -> str:
+    parts = []
+    for name, value in facts.items():
+        if isinstance(value, list):
+            parts.append(f"{name}: {', '.join(str(item) for item in value)}")
+        elif isinstance(value, dict):
+            parts.append(f"{name}: " + ", ".join(f"{key}={item}" for key, item in value.items()))
+        else:
+            parts.append(f"{name}: {value}")
+    return "[" + "; ".join(parts) + "]"
 
 
 def _load_recipe_plugins(paths) -> None:

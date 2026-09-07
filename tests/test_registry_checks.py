@@ -35,7 +35,7 @@ flow:
     uri: /a/b/c
     inputs: [raw]
     outputs: []
-    when: /kosul/proj/ghost
+    when: {uri: /kosul/proj/ghost}
 """)
     assert "unknown_uri" in kinds(check([path]))
 

@@ -172,3 +172,47 @@ flow:
     real: {uri: /a/b/c, outputs: [x]}
 """)
     assert "reserved_name" in kinds(check([path]))
+
+
+def test_graph_node_with_several_outputs_needs_unpack(write):
+    path = write("a.yaml", """
+blocks:
+  two:
+    inputs: [x]
+    outputs: [a, b]
+    graph:
+      both: {uri: /a/b/c, partial: true, inputs: x, outputs: [a, b]}
+pair:
+  block: two
+  builder: /builder/cirak/compose
+""")
+    kinds = [problem.kind for problem in check([path])]
+    assert "needs_unpack" in kinds
+
+
+def test_unpack_on_a_block_item_is_rejected(write):
+    path = write("a.yaml", """
+blocks:
+  inner:
+    spec:
+      - {uri: /a/b/c, partial: true}
+  outer:
+    inputs: [x]
+    outputs: [y]
+    graph:
+      y: {block: inner, inputs: x, unpack: true}
+thing:
+  block: outer
+  builder: /builder/cirak/compose
+""")
+    problems = check([path])
+    assert any(problem.kind == "invalid_block" and "unpack" in problem.message for problem in problems)
+
+
+def test_unpack_must_be_a_boolean(write):
+    path = write("a.yaml", """
+flow:
+  outputs: [y]
+  seed: {uri: /a/b/c, outputs: [y], unpack: "yes"}
+""")
+    assert [problem.kind for problem in check([path])] == ["invalid_unpack"]

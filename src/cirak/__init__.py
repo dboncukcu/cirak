@@ -1,7 +1,7 @@
 from importlib.metadata import PackageNotFoundError, version
 
-from .api import check, resolve, run
-from .build import Graph, GraphNode
+from .api import check, flow_dump, layers, resolve, run
+from .build import Deferred, Graph, GraphNode
 from .errors import (
     BuildError,
     CirakError,
@@ -11,7 +11,7 @@ from .errors import (
     RegistryError,
     Source,
 )
-from .registry import Registry, register, register_fragment, register_many
+from .registry import Facts, Registry, declare_kinds, lego, register, register_fragment, register_many
 from .std import register_std
 
 try:
@@ -24,6 +24,8 @@ __all__ = [
     "CirakError",
     "CirakWarning",
     "ConfigError",
+    "Deferred",
+    "Facts",
     "Graph",
     "GraphNode",
     "Problem",
@@ -32,6 +34,10 @@ __all__ = [
     "Source",
     "__version__",
     "check",
+    "declare_kinds",
+    "flow_dump",
+    "layers",
+    "lego",
     "register",
     "register_fragment",
     "register_many",

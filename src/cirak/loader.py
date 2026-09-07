@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from ruamel.yaml import YAML
@@ -17,17 +17,42 @@ class LoadedFile:
     provenance: dict[tuple, Source]
 
 
-def load(paths, fragments=None) -> tuple[list[LoadedFile], list[Problem]]:
-    files: list[LoadedFile] = []
+@dataclass
+class Layer:
+    """One layer of a recipe: its files, merged strictly, above the layers it includes.
+
+    The root layer holds the files given on the command line; every included
+    file is a layer of its own, placed below the file that includes it, in
+    list order from bottom to top.
+    """
+
+    files: list[LoadedFile] = field(default_factory=list)
+    below: list["Layer"] = field(default_factory=list)
+    label: str = ""
+    included_by: str | None = None
+
+    def walk(self):
+        for layer in self.below:
+            yield from layer.walk()
+        yield from self.files
+
+    def ordered(self, depth=0):
+        """Layers bottom to top as (depth, layer) pairs."""
+        for layer in self.below:
+            yield from layer.ordered(depth + 1)
+        yield depth, self
+
+
+def load(paths, fragments=None) -> tuple[Layer, list[Problem]]:
     problems: list[Problem] = []
     done: set[Path] = set()
-    stack: list[Path] = []
+    root = Layer(label="command line")
     for raw in paths:
-        _load_file(Path(raw).resolve(), files, problems, done, stack, fragments)
-    return files, problems
+        _load_into(root, Path(raw).resolve(), problems, done, [], fragments, top=True)
+    return root, problems
 
 
-def _load_file(path, files, problems, done, stack, fragments) -> None:
+def _load_into(parent, path, problems, done, stack, fragments, top=False) -> None:
     if path in stack:
         chain = " -> ".join(entry.name for entry in [*stack, path])
         problems.append(error("include_cycle", f"include cycle: {chain}"))
@@ -39,15 +64,20 @@ def _load_file(path, files, problems, done, stack, fragments) -> None:
     problems.extend(parse_problems)
     if tree is None:
         return
-    data: dict = {}
     provenance: dict[tuple, Source] = {}
-    converted = _convert(tree, (), str(path), provenance)
-    data.update(converted)
+    data = _convert(tree, (), str(path), provenance)
     includes = data.pop("include", [])
     if not isinstance(includes, list):
         problems.append(error("parse_error", "include must be a list of paths or fragment URIs",
                               provenance.get(("include",))))
         includes = []
+    loaded = LoadedFile(str(path), data, provenance)
+    if top:
+        layer = parent
+        layer.files.append(loaded)
+    else:
+        layer = Layer(files=[loaded], label=str(path), included_by=str(stack[-1]) if stack else None)
+        parent.below.append(layer)
     stack.append(path)
     for position, entry in enumerate(includes):
         source = provenance.get(("include", position))
@@ -59,11 +89,10 @@ def _load_file(path, files, problems, done, stack, fragments) -> None:
                 problems.append(error("include_not_found", f"fragment {entry} is not registered", source,
                                       hint="fragment URIs resolve through the registry"))
             else:
-                _load_file(Path(target).resolve(), files, problems, done, stack, fragments)
+                _load_into(layer, Path(target).resolve(), problems, done, stack, fragments)
         else:
-            _load_file((path.parent / entry).resolve(), files, problems, done, stack, fragments)
+            _load_into(layer, (path.parent / entry).resolve(), problems, done, stack, fragments)
     stack.pop()
-    files.append(LoadedFile(str(path), data, provenance))
 
 
 def _parse(path):
@@ -137,3 +166,45 @@ def _scalar(value):
     if isinstance(value, str):
         return str(value)
     return value
+
+
+def parse_value(text: str):
+    """Parse a command line value the way YAML would read it in a file."""
+    yaml = YAML(typ="safe")
+    loaded = yaml.load(text)
+    return _plain(loaded)
+
+
+def _plain(value):
+    if isinstance(value, dict):
+        return {_scalar(key): _plain(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_plain(item) for item in value]
+    return _scalar(value)
+
+
+def set_layer(sets) -> Layer:
+    """The top layer built from ``--set path=value`` assignments."""
+    data: dict = {}
+    provenance: dict[tuple, Source] = {}
+    for number, (dotted_path, value) in enumerate(sets, 1):
+        parts = tuple(dotted_path.split("."))
+        target = data
+        for depth, part in enumerate(parts[:-1]):
+            if not isinstance(target.get(part), dict):
+                target[part] = {}
+            provenance.setdefault(parts[:depth + 1], Source("--set", number))
+            target = target[part]
+        target[parts[-1]] = value
+        _stamp(parts, value, provenance, Source("--set", number))
+    return Layer(files=[LoadedFile("--set", data, provenance)], label="--set")
+
+
+def _stamp(path, value, provenance, source) -> None:
+    provenance[path] = source
+    if isinstance(value, dict):
+        for key, item in value.items():
+            _stamp(path + (key,), item, provenance, source)
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            _stamp(path + (index,), item, provenance, source)

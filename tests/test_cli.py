@@ -103,7 +103,7 @@ def test_ls_with_recipe_plugins(write, tmp_path, monkeypatch, capsys):
 
 
 def test_ls_with_broken_recipe_still_lists(tmp_path, capsys):
-    missing = str(tmp_path / "yok.yaml")
+    missing = str(tmp_path / "missing.yaml")
     assert main(["ls", "/stat", "--recipe", missing]) == 0
     captured = capsys.readouterr()
     assert "include_not_found" in captured.err
