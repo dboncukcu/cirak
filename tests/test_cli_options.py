@@ -1,11 +1,11 @@
 import pytest
 
-from cirak import lego
+from cirak import register
 from cirak.cli import main
 
 
 def test_set_overrides_a_leaf_with_a_yaml_value(write, capsys, tmp_path):
-    lego("/c/test/const", lambda value: value)
+    register("/c/test/const", lambda value: value)
     path = write("a.yaml", """
 params:
   n: 1
@@ -42,7 +42,7 @@ def test_check_layers_prints_the_tree(write, capsys):
 
 
 def test_check_and_run_take_inputs(write, capsys):
-    lego("/c/test/place", lambda device: device)
+    register("/c/test/place", lambda device: device)
     path = write("a.yaml", "flow:\n  outputs: [placed]\n  place: {uri: /c/test/place, outputs: [placed]}\n")
     assert main(["check", path]) == 1
     assert "[missing_input]" in capsys.readouterr().out
@@ -55,7 +55,7 @@ def test_check_and_run_take_inputs(write, capsys):
 
 
 def test_show_flow_prints_the_expanded_flow(write, capsys):
-    lego("/c/test/frame", lambda set: set)
+    register("/c/test/frame", lambda set: set)
     path = write("a.yaml", """
 blocks:
   data:
@@ -76,7 +76,7 @@ flow:
 
 
 def test_ls_prints_kind_and_facts(capsys):
-    lego("/turn/test/train", lambda models, device="cpu": models, kind="turn", returns=["models"],
+    register("/turn/test/train", lambda models, device="cpu": models, kind="turn", returns=["models"],
          bus=["device"], mutates=["models"], description="train once")
     assert main(["ls", "/turn/test"]) == 0
     out = capsys.readouterr().out

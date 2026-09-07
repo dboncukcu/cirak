@@ -1,6 +1,6 @@
 import pytest
 
-from cirak import BuildError, check, lego
+from cirak import BuildError, check, register
 from cirak.api import analyze
 from cirak.build import build_components
 
@@ -89,12 +89,12 @@ score: {block: anomaly_score, builder: /builder/test/names}
 
 
 def layers():
-    lego("/layer/test/linear", lambda in_features=None, out_features=None: ("linear", in_features, out_features),
+    register("/layer/test/linear", lambda in_features=None, out_features=None: ("linear", in_features, out_features),
          kind="layer")
-    lego("/layer/test/relu", lambda: "relu", kind="layer")
-    lego("/layer/test/concat", lambda dim: ("concat", dim), kind="layer")
-    lego("/layer/test/l1", lambda: "l1", kind="layer")
-    lego("/builder/test/names", lambda graph: graph, kind="builder")
+    register("/layer/test/relu", lambda: "relu", kind="layer")
+    register("/layer/test/concat", lambda dim: ("concat", dim), kind="layer")
+    register("/layer/test/l1", lambda: "l1", kind="layer")
+    register("/builder/test/names", lambda graph: graph, kind="builder")
 
 
 def test_tidy_blocks_expand_like_the_dump(write):

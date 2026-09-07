@@ -1,6 +1,6 @@
 import pytest
 
-from cirak import Deferred, check, lego, resolve, run
+from cirak import check, Deferred, register, resolve, run
 from cirak.api import analyze
 from cirak.build import build_components
 
@@ -23,8 +23,8 @@ def test_inline_component_is_built_at_compile_time(write):
     def checkpoint(policy, every=1):
         return policy
 
-    lego("/ckpt/test/best", Policy, kind="checkpoint")
-    lego("/ckpt/test/checkpoint", checkpoint)
+    register("/ckpt/test/best", Policy, kind="checkpoint")
+    register("/ckpt/test/checkpoint", checkpoint)
     path = write("a.yaml", """
 alias:
   best: /ckpt/test/best
@@ -47,9 +47,9 @@ def test_inline_component_partial_by_fact_or_by_key(write):
     def adapter(criterion, output=None):
         return criterion
 
-    lego("/criterion/test/huber", criterion, kind="criterion", partial=True)
-    lego("/num/test/scale", scale)
-    lego("/adapter/test/criterion", adapter, kind="adapter")
+    register("/criterion/test/huber", criterion, kind="criterion", partial=True)
+    register("/num/test/scale", scale)
+    register("/adapter/test/criterion", adapter, kind="adapter")
     path = write("a.yaml", """
 huber: {uri: /adapter/test/criterion, params: {criterion: {uri: /criterion/test/huber, params: {delta: 2.0}}}}
 doubler: {uri: /adapter/test/criterion, params: {criterion: {uri: /num/test/scale, params: {factor: 2}, partial: true}}}
@@ -70,8 +70,8 @@ def test_data_kind_is_deferred_not_built(write):
     def cross_entropy(weight=None):
         return weight
 
-    lego("/data/test/class_weights", class_weights, kind="data")
-    lego("/criterion/test/ce", cross_entropy, kind="criterion")
+    register("/data/test/class_weights", class_weights, kind="data")
+    register("/criterion/test/ce", cross_entropy, kind="criterion")
     path = write("a.yaml", """
 losses:
   ce: {uri: /criterion/test/ce, params: {weight: {uri: /data/test/class_weights, params: {power: 0.5}}}}
@@ -93,9 +93,9 @@ def test_inline_component_inside_flow_step_params(write):
     def turn(schedule, loader):
         return f"{schedule}:{loader}"
 
-    lego("/schedule/test/linear", schedule, kind="schedule")
-    lego("/turn/test/turn", turn)
-    lego("/g/test/loader", lambda: "L", returns="loader")
+    register("/schedule/test/linear", schedule, kind="schedule")
+    register("/turn/test/turn", turn)
+    register("/g/test/loader", lambda: "L", returns="loader")
     path = write("a.yaml", """
 flow:
   outputs: [turn]
@@ -107,7 +107,7 @@ flow:
 
 
 def test_inline_components_are_validated(write):
-    lego("/schedule/test/steps", lambda size, gamma=0.1: (size, gamma), kind="schedule")
+    register("/schedule/test/steps", lambda size, gamma=0.1: (size, gamma), kind="schedule")
     path = write("a.yaml", """
 one: {uri: /a/b/c, params: {s: {uri: /schedule/test/steps, params: {size: 1, wrong: 2}}}}
 two: {uri: /a/b/c, params: {s: {uri: /schedule/test/steps}}}
@@ -128,9 +128,9 @@ flow:
 
 
 def test_nested_inline_components(write):
-    lego("/pre/test/log", lambda base: f"log{base}", kind="pre")
-    lego("/pre/test/wrap", lambda inner: f"[{inner}]", kind="pre")
-    lego("/g/test/hold", lambda value: value)
+    register("/pre/test/log", lambda base: f"log{base}", kind="pre")
+    register("/pre/test/wrap", lambda inner: f"[{inner}]", kind="pre")
+    register("/g/test/hold", lambda value: value)
     path = write("a.yaml", """
 thing: {uri: /g/test/hold, params: {value: {uri: /pre/test/wrap, params: {inner: {uri: /pre/test/log, params: {base: 10}}}}}}
 """)
@@ -153,8 +153,8 @@ def test_check_does_not_build_inline_components(write):
         calls.append(n)
         return n
 
-    lego("/g/test/factory", factory)
-    lego("/g/test/hold2", lambda value: value)
+    register("/g/test/factory", factory)
+    register("/g/test/hold2", lambda value: value)
     path = write("a.yaml", """
 flow:
   outputs: [hold]

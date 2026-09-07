@@ -1,6 +1,6 @@
 import pytest
 
-from cirak import ConfigError, check, lego, run
+from cirak import check, ConfigError, register, run
 
 
 def kinds(problems):
@@ -23,7 +23,7 @@ def test_inputs_are_root_bus_keys_and_params_are_not(write):
         seen.append((device, record))
         return f"{device}:{record}"
 
-    lego("/r/test/place", place)
+    register("/r/test/place", place)
     path = write("a.yaml", RECIPE)
     assert check([path], inputs=["device", "record"]) == []
     report = run([path], inputs={"device": "cpu", "record": "runs/x"})
@@ -32,7 +32,7 @@ def test_inputs_are_root_bus_keys_and_params_are_not(write):
 
 
 def test_check_without_the_inputs_reports_missing_keys_with_location(write):
-    lego("/r/test/place", lambda device, record: device)
+    register("/r/test/place", lambda device, record: device)
     path = write("a.yaml", RECIPE)
     problems = check([path])
     assert kinds(problems) == ["missing_input", "missing_input"]
@@ -43,7 +43,7 @@ def test_check_without_the_inputs_reports_missing_keys_with_location(write):
 
 
 def test_unexpected_input_is_an_error_in_check_and_run(write):
-    lego("/r/test/place", lambda device, record: device)
+    register("/r/test/place", lambda device, record: device)
     path = write("a.yaml", RECIPE)
     assert kinds(check([path], inputs=["device", "record", "extra"])) == ["unexpected_input"]
     with pytest.raises(ConfigError) as caught:
@@ -52,7 +52,7 @@ def test_unexpected_input_is_an_error_in_check_and_run(write):
 
 
 def test_run_without_a_required_input_is_a_config_error(write):
-    lego("/r/test/place", lambda device, record: device)
+    register("/r/test/place", lambda device, record: device)
     path = write("a.yaml", RECIPE)
     with pytest.raises(ConfigError) as caught:
         run([path], inputs={"device": "cpu"})
@@ -66,8 +66,8 @@ def test_check_never_builds_components(write):
         built.append(True)
         return object()
 
-    lego("/r/test/factory", factory)
-    lego("/r/test/use", lambda thing: "ok")
+    register("/r/test/factory", factory)
+    register("/r/test/use", lambda thing: "ok")
     path = write("a.yaml", """
 things:
   one: {uri: /r/test/factory}
@@ -82,7 +82,7 @@ flow:
 
 
 def test_sinks_receive_tezgah_events(write):
-    lego("/r/test/five", lambda: 5, returns="x")
+    register("/r/test/five", lambda: 5, returns="x")
     path = write("a.yaml", "flow:\n  outputs: [x]\n  seed: {uri: /r/test/five}\n")
     events = []
     run([path], sinks=[events.append])
@@ -96,8 +96,8 @@ def test_check_sees_implicit_bindings_of_run_inputs(write):
         seen.append(device)
         return value
 
-    lego("/r/test/work", work, bus=["device"])
-    lego("/r/test/one", lambda: 1, returns="value")
+    register("/r/test/work", work, bus=["device"])
+    register("/r/test/one", lambda: 1, returns="value")
     path = write("a.yaml", """
 flow:
   outputs: [work]

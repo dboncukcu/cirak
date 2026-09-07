@@ -186,6 +186,7 @@ class Registry:
         return list(self._kinds)
 
     def register(self, uri, target=None, *, description=None, **facts):
+        """Register ``target`` under ``uri`` with the facts it declares, or return a decorator."""
         if target is None:
             def decorator(fn):
                 self._add(Entry(uri, fn, _describe(fn, description), facts=_normalize_facts(uri, facts)))
@@ -193,9 +194,6 @@ class Registry:
             return decorator
         self._add(Entry(uri, target, _describe(target, description), facts=_normalize_facts(uri, facts)))
         return target
-
-    def lego(self, uri, target=None, *, description=None, **facts):
-        return self.register(uri, target, description=description, **facts)
 
     def register_many(self, prefix, entries) -> None:
         for name, value in entries.items():
@@ -298,10 +296,6 @@ registry = Registry()
 
 
 def register(uri, target=None, *, description=None, **facts):
-    return registry.register(uri, target, description=description, **facts)
-
-
-def lego(uri, target=None, *, description=None, **facts):
     return registry.register(uri, target, description=description, **facts)
 
 

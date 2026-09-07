@@ -1,11 +1,10 @@
 """A permissive stand in for kalfa's std legos: their signatures and facts, no torch.
 
 kalfa registers with its own ``@kalfa.lego``, which derives the kind from the first segment of the URI;
-``lego`` below does the same over cirak's ``lego(kind=...)``, so a URI and its kind never drift apart.
+``lego`` below does the same over cirak's ``register(kind=...)``, so a URI and its kind never drift apart.
 """
 
-from cirak import declare_kinds
-from cirak import lego as cirak_lego
+from cirak import declare_kinds, register
 from cirak.registry import registry
 
 KINDS = ("source", "split", "pre", "feed", "loader", "layer", "init", "criterion", "objective", "metric",
@@ -16,7 +15,7 @@ KINDS = ("source", "split", "pre", "feed", "loader", "layer", "init", "criterion
 def lego(uri, target=None, **facts):
     """Register under ``uri`` with the kind its first segment names."""
     facts.setdefault("kind", uri.split("/")[1])
-    return cirak_lego(uri, target, **facts)
+    return register(uri, target, **facts)
 
 
 class Model:

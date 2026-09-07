@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from cirak import check, resolve
+from cirak import check, register, resolve
 from cirak.api import analyze, annotated, layers, write_resolved
 from cirak.loader import load, parse_value
 from cirak.merge import merge_layers

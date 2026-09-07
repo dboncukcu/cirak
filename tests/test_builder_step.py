@@ -1,6 +1,6 @@
 import pytest
 
-from cirak import ConfigError, check, lego, run
+from cirak import check, ConfigError, register, run
 from cirak.api import analyze
 
 
@@ -31,10 +31,10 @@ def catalog():
         made.append(out_features)
         return ("linear", out_features)
 
-    lego("/layer/test/linear2", linear, kind="layer")
-    lego("/layer/test/relu2", lambda: "relu", kind="layer")
-    lego("/builder/test/module", Module, kind="builder")
-    lego("/std/test/pack", lambda items: items)
+    register("/layer/test/linear2", linear, kind="layer")
+    register("/layer/test/relu2", lambda: "relu", kind="layer")
+    register("/builder/test/module", Module, kind="builder")
+    register("/std/test/pack", lambda items: items)
     return made
 
 
@@ -120,7 +120,7 @@ flow:
 
 def test_builder_step_signature_and_kind_checks(write):
     catalog()
-    lego("/layer/test/notbuilder", lambda graph: graph, kind="layer")
+    register("/layer/test/notbuilder", lambda graph: graph, kind="layer")
     path = write("a.yaml", """
 blocks:
   net:

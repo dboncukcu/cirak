@@ -1,6 +1,6 @@
 import pytest
 
-from cirak import check, lego, run
+from cirak import check, register, run
 from cirak.api import analyze, flow_dump
 
 
@@ -19,9 +19,9 @@ def expanded(paths):
 
 
 def test_flow_block_opens_into_a_transparent_pipeline(write):
-    lego("/b/test/seed", lambda value: value, returns="seed")
-    lego("/b/test/scale", lambda value, factor, offset=0: value * factor + offset, returns="scaled")
-    lego("/b/test/report", lambda scaled: {"scaled": scaled}, returns="report")
+    register("/b/test/seed", lambda value: value, returns="seed")
+    register("/b/test/scale", lambda value, factor, offset=0: value * factor + offset, returns="scaled")
+    register("/b/test/report", lambda scaled: {"scaled": scaled}, returns="report")
     path = write("a.yaml", """
 blocks:
   scaler:
@@ -47,8 +47,8 @@ flow:
 
 
 def test_usage_renames_at_a_closed_boundary(write):
-    lego("/b/test/const", lambda value: value)
-    lego("/b/test/double", lambda x: x * 2, returns="doubled")
+    register("/b/test/const", lambda value: value)
+    register("/b/test/double", lambda x: x * 2, returns="doubled")
     path = write("a.yaml", """
 blocks:
   doubler:
@@ -66,10 +66,10 @@ flow:
 
 
 def test_variables_carry_references_and_field_access(write):
-    lego("/b/test/apply", lambda fn, value: fn(value), returns="applied")
-    lego("/b/test/inc", lambda value, by: value + by, partial=True)
-    lego("/b/test/five", lambda: 5, returns="value")
-    lego("/b/test/named", lambda label: label, returns="label")
+    register("/b/test/apply", lambda fn, value: fn(value), returns="applied")
+    register("/b/test/inc", lambda value, by: value + by, partial=True)
+    register("/b/test/five", lambda: 5, returns="value")
+    register("/b/test/named", lambda label: label, returns="label")
     path = write("a.yaml", """
 alias:
   five: /b/test/five
@@ -111,7 +111,7 @@ flow:
 
 
 def test_foreach_names_nodes_by_key_template_or_index(write):
-    lego("/b/test/frame", lambda set: f"{set}!", returns="frame")
+    register("/b/test/frame", lambda set: f"{set}!", returns="frame")
     path = write("a.yaml", """
 blocks:
   data:
@@ -143,10 +143,10 @@ def test_foreach_chain_index_and_count(write):
     def rule(rules, name, value):
         return {**rules, name: value}
 
-    lego("/b/test/empty", lambda: {}, returns="rules")
-    lego("/b/test/open", open_rules)
-    lego("/b/test/rule", rule)
-    lego("/b/test/identity", lambda value: value, aliases="value")
+    register("/b/test/empty", lambda: {}, returns="rules")
+    register("/b/test/open", open_rules)
+    register("/b/test/rule", rule)
+    register("/b/test/identity", lambda value: value, aliases="value")
     path = write("a.yaml", """
 blocks:
   ruling:
@@ -194,9 +194,9 @@ flow:
 
 
 def test_foreach_over_mapping_names_nodes_by_the_mapping_key(write):
-    lego("/b/test/opt", lambda lr, model: (model, lr))
-    lego("/b/test/pack", lambda items: items, returns="optimizers")
-    lego("/b/test/model", lambda: "m")
+    register("/b/test/opt", lambda lr, model: (model, lr))
+    register("/b/test/pack", lambda items: items, returns="optimizers")
+    register("/b/test/model", lambda: "m")
     path = write("a.yaml", """
 blocks:
   optimizers:
@@ -221,7 +221,7 @@ flow:
 
 
 def test_foreach_key_template_reads_item_fields(write):
-    lego("/b/test/build", lambda seed, index: (seed, index))
+    register("/b/test/build", lambda seed, index: (seed, index))
     path = write("a.yaml", """
 blocks:
   models:
@@ -241,11 +241,11 @@ flow:
 
 
 def test_foreach_inside_a_loop_body_of_a_block(write):
-    lego("/b/test/zero", lambda: 0, returns="n")
-    lego("/b/test/two", lambda: 2, returns="turns")
-    lego("/b/test/bump", lambda n: n + 1, returns="n_next")
-    lego("/b/test/score", lambda n_next, set: f"{set}:{n_next}")
-    lego("/b/test/merge", lambda parts: dict(parts), returns="metrics")
+    register("/b/test/zero", lambda: 0, returns="n")
+    register("/b/test/two", lambda: 2, returns="turns")
+    register("/b/test/bump", lambda n: n + 1, returns="n_next")
+    register("/b/test/score", lambda n_next, set: f"{set}:{n_next}")
+    register("/b/test/merge", lambda parts: dict(parts), returns="metrics")
     path = write("a.yaml", """
 blocks:
   training:
@@ -278,7 +278,7 @@ flow:
 
 
 def test_foreach_in_the_root_flow(write):
-    lego("/b/test/const", lambda value: value)
+    register("/b/test/const", lambda value: value)
     path = write("a.yaml", """
 params:
   names: [a, b]
@@ -371,7 +371,7 @@ flow:
 
 
 def test_problems_in_expanded_nodes_point_at_the_template(write):
-    lego("/b/test/needs", lambda value, other: value)
+    register("/b/test/needs", lambda value, other: value)
     path = write("a.yaml", """
 blocks:
   stage:
@@ -388,8 +388,8 @@ flow:
 
 
 def test_flow_dump_shows_expanded_nodes_with_resolution_comments(write, tmp_path):
-    lego("/b/test/frame", lambda set, device="cpu": f"{set}@{device}", bus=["device"])
-    lego("/b/test/merge", lambda parts: dict(parts), returns="metrics")
+    register("/b/test/frame", lambda set, device="cpu": f"{set}@{device}", bus=["device"])
+    register("/b/test/merge", lambda parts: dict(parts), returns="metrics")
     path = write("a.yaml", """
 blocks:
   data:

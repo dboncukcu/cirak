@@ -193,7 +193,7 @@ Registration comes in four forms:
 ```python
 cirak.register("/table/demo/dropna", dropna, description="Drop rows with missing values")
 
-@cirak.lego("/report/proj/weekly", kind="lego", returns="report", bus=["record"])
+@cirak.register("/report/proj/weekly", kind="lego", returns="report", bus=["record"])
 def weekly(rows, title, record=None): ...
 
 cirak.register_many("/series/statlib", {
@@ -204,7 +204,9 @@ cirak.register_many("/series/statlib", {
 cirak.register_fragment("/flow/proj/report", path, description="CSV to JSON summary flow")
 ```
 
-`lego` is `register` with facts as keyword arguments; the two names are the same function.
+`register` takes the facts as keyword arguments and works either way, as a call or as a decorator. A catalog that
+wants its own vocabulary wraps it: kalfa registers with `@kalfa.lego`, which derives the kind from the first
+segment of the URI and hands the rest to `register`.
 
 Rules worth knowing:
 
@@ -601,7 +603,6 @@ runs/x1/
 
 ```python
 register(uri, target=None, *, description=None, **facts)
-lego(uri, target=None, *, description=None, **facts)
 register_many(prefix, entries)
 register_fragment(uri, path, *, description)
 register_std(registry)
@@ -612,7 +613,8 @@ flow_dump(paths, *, sets=None, inputs=None) -> str
 run(paths, *, sets=None, inputs=None, sinks=None, record_dir=None, executor="serial", workers=None) -> tezgah.Report
 ```
 
-`sets` is a list of `(dotted_path, value)` pairs, the top layer. `inputs` are the root bus keys: names for `check` and `flow_dump`, a mapping of name to value for `run`. `sinks` are callables subscribed to tezgah's event stream. `check` returns findings without raising. `resolve` returns the resolved recipe and raises `ConfigError` on errors. `run` compiles, builds, and executes on tezgah; `executor` accepts tezgah's `"serial"`, `"thread"` and `"dask"`. The command line is a thin shell over these functions.
+`register` is the single entry point of the registry: a call or a decorator, with the lego's facts as keyword
+arguments. `sets` is a list of `(dotted_path, value)` pairs, the top layer. `inputs` are the root bus keys: names for `check` and `flow_dump`, a mapping of name to value for `run`. `sinks` are callables subscribed to tezgah's event stream. `check` returns findings without raising. `resolve` returns the resolved recipe and raises `ConfigError` on errors. `run` compiles, builds, and executes on tezgah; `executor` accepts tezgah's `"serial"`, `"thread"` and `"dask"`. The command line is a thin shell over these functions.
 
 ## Development
 

@@ -1,4 +1,4 @@
-from cirak import check, lego, run
+from cirak import check, register, run
 
 
 def kinds(problems):
@@ -19,11 +19,11 @@ def test_loop_grammar_range_key_next_suffix_until_key_transparent_body(write):
     def judge(metrics):
         return {"stop": metrics["w"] >= 7.0}
 
-    lego("/g/test/seed", seed, returns="models")
-    lego("/g/test/left", epochs_left, returns="epochs_left")
-    lego("/g/test/loader", lambda: 1.0, returns="train_loader")
-    lego("/g/test/turn", turn, returns=["models", "metrics"], mutates=["models"], bus=["device"])
-    lego("/g/test/judge", judge, returns=["stop"])
+    register("/g/test/seed", seed, returns="models")
+    register("/g/test/left", epochs_left, returns="epochs_left")
+    register("/g/test/loader", lambda: 1.0, returns="train_loader")
+    register("/g/test/turn", turn, returns=["models", "metrics"], mutates=["models"], bus=["device"])
+    register("/g/test/judge", judge, returns=["stop"])
     path = write("a.yaml", """
 flow:
   outputs: [history, models]
@@ -65,10 +65,10 @@ def test_input_binding_forms_pattern_group_and_list(write):
     def total(values):
         return sum(values)
 
-    lego("/g/test/one", one)
-    lego("/g/test/merge", merge, returns="metrics")
-    lego("/g/test/pack", pack)
-    lego("/g/test/total", total)
+    register("/g/test/one", one)
+    register("/g/test/merge", merge, returns="metrics")
+    register("/g/test/pack", pack)
+    register("/g/test/total", total)
     path = write("a.yaml", """
 flow:
   outputs: [metrics, pack, total]
@@ -84,8 +84,8 @@ flow:
 
 
 def test_map_collect_list_form_and_index(write):
-    lego("/g/test/items", lambda: [3, 1, 2], returns="xs")
-    lego("/g/test/scale", lambda x, i: x * 10 + i, returns="y")
+    register("/g/test/items", lambda: [3, 1, 2], returns="xs")
+    register("/g/test/scale", lambda x, i: x * 10 + i, returns="y")
     path = write("a.yaml", """
 flow:
   outputs: [y]
@@ -136,8 +136,8 @@ flow:
 
 
 def test_until_predicate_mapping_form(write):
-    lego("/g/test/bump", lambda x: x + 1, returns="x_next")
-    lego("/g/test/big", lambda x_next, limit: x_next >= limit, kind="predicate")
+    register("/g/test/bump", lambda x: x + 1, returns="x_next")
+    register("/g/test/big", lambda x_next, limit: x_next >= limit, kind="predicate")
     path = write("a.yaml", """
 flow:
   outputs: [final]
@@ -152,7 +152,7 @@ flow:
       body: {uri: /g/test/bump}
 """)
     assert check([path]) == []
-    lego("/g/test/zero", lambda: 0)
+    register("/g/test/zero", lambda: 0)
     path = write("b.yaml", """
 flow:
   outputs: [final]

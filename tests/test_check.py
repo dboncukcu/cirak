@@ -1,6 +1,6 @@
 import pytest
 
-from cirak import CirakWarning, ConfigError, check, resolve
+from cirak import check, CirakWarning, ConfigError, register, resolve
 
 FULL = """
 params:
@@ -83,9 +83,9 @@ def test_variant_selection_by_file(write):
 
 
 def test_empty_top_level_section_is_an_empty_group(write):
-    from cirak import lego, run
+    from cirak import register, run
 
-    lego("/t/check/take", lambda plots, metrics: (dict(plots), dict(metrics)))
+    register("/t/check/take", lambda plots, metrics: (dict(plots), dict(metrics)))
     path = write("a.yaml", """
 plots: {}
 metrics:

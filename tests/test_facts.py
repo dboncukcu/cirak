@@ -2,7 +2,7 @@ import sys
 
 import pytest
 
-from cirak import ConfigError, RegistryError, check, lego, register, run
+from cirak import check, ConfigError, register, RegistryError, run
 from cirak.registry import UNSET, Facts, Registry
 
 
@@ -15,7 +15,7 @@ def test_lego_stores_normalized_facts():
     fresh.declare_kinds("turn")
     assert fresh.kinds == ["builder", "predicate", "data", "turn"]
 
-    @fresh.lego("/turn/test/train", kind="turn", alias=["train", "supervised"],
+    @fresh.register("/turn/test/train", kind="turn", alias=["train", "supervised"],
                 returns=["models", "metrics"], bus=["device"], mutates=["models"],
                 state=["models"], refs={"loss": "loss"}, uses=["predicts"], needs_grad=True,
                 needs_models=["net"], description="a turn")
@@ -50,14 +50,14 @@ def test_extras_fact_is_stored_without_a_signature_check():
     def turn(models, params, extra):
         return models
 
-    fresh.lego("/turn/test/alternating", turn, kind="turn", extras=["amp", "grad_clip", "accumulate"])
+    fresh.register("/turn/test/alternating", turn, kind="turn", extras=["amp", "grad_clip", "accumulate"])
     facts = fresh.facts("/turn/test/alternating")
     assert facts.extras == ("amp", "grad_clip", "accumulate")
     assert facts.declared()["extras"] == ["amp", "grad_clip", "accumulate"]
-    fresh.lego("/turn/test/one", turn, kind="turn", extras="amp")
+    fresh.register("/turn/test/one", turn, kind="turn", extras="amp")
     assert fresh.facts("/turn/test/one").extras == ("amp",)
     with pytest.raises(RegistryError, match="extras must be a string or a list"):
-        fresh.lego("/turn/test/bad", turn, kind="turn", extras=3)
+        fresh.register("/turn/test/bad", turn, kind="turn", extras=3)
 
 
 def test_returns_none_differs_from_no_returns_fact():
@@ -166,10 +166,10 @@ def test_returns_fact_fills_outputs(write):
     def whole(table):
         return table["rows"] * 2
 
-    lego("/f/test/table", table, returns="df")
-    lego("/f/test/split", split, returns=["train", "test"])
-    lego("/f/test/log", log, returns=None)
-    lego("/f/test/whole", whole)
+    register("/f/test/table", table, returns="df")
+    register("/f/test/split", split, returns=["train", "test"])
+    register("/f/test/log", log, returns=None)
+    register("/f/test/whole", whole)
     path = write("a.yaml", """
 flow:
   outputs: [train, test, doubled]
@@ -188,8 +188,8 @@ def test_yaml_outputs_override_returns_fact(write):
     def split(table):
         return {"train": 1, "test": 2}
 
-    lego("/f/test/split2", split, returns=["train", "test"])
-    lego("/f/test/three", lambda: 3, returns="x")
+    register("/f/test/split2", split, returns=["train", "test"])
+    register("/f/test/three", lambda: 3, returns="x")
     path = write("a.yaml", """
 flow:
   outputs: [whole, tr]
@@ -208,9 +208,9 @@ def test_bus_fact_binds_defaulted_parameters_implicitly(write):
         seen.append((value, device, tag))
         return value
 
-    lego("/f/test/work", work, bus=["device", "tag"])
-    lego("/f/test/dev", lambda: "cuda", returns="device")
-    lego("/f/test/one", lambda: 1, returns="value")
+    register("/f/test/work", work, bus=["device", "tag"])
+    register("/f/test/dev", lambda: "cuda", returns="device")
+    register("/f/test/one", lambda: 1, returns="value")
     path = write("a.yaml", """
 flow:
   outputs: [work]
@@ -234,9 +234,9 @@ def test_mutates_fact_gives_passthrough_to_a_gated_step(write):
         state["n"] += 1
         return state
 
-    lego("/f/test/state", state, returns="state")
-    lego("/f/test/flag", flag, returns="go")
-    lego("/f/test/touch", touch, mutates=["state"])
+    register("/f/test/state", state, returns="state")
+    register("/f/test/flag", flag, returns="go")
+    register("/f/test/touch", touch, mutates=["state"])
     path = write("a.yaml", """
 flow:
   outputs: [state_next]
@@ -249,9 +249,9 @@ flow:
 
 
 def test_gated_step_without_covering_facts_is_a_tezgah_problem(write):
-    lego("/f/test/state3", lambda: {"n": 0}, returns="state")
-    lego("/f/test/flag3", lambda: False, returns="go")
-    lego("/f/test/touch3", lambda state: state)
+    register("/f/test/state3", lambda: {"n": 0}, returns="state")
+    register("/f/test/flag3", lambda: False, returns="go")
+    register("/f/test/touch3", lambda state: state)
     path = write("a.yaml", """
 flow:
   outputs: [state_next]
@@ -266,9 +266,9 @@ flow:
 
 
 def test_condition_targets_must_be_predicates(write):
-    lego("/f/test/is_big", lambda n: n > 2, kind="predicate")
-    lego("/f/test/not_pred", lambda n: n, kind="metric")
-    lego("/f/test/untyped", lambda n: n > 1)
+    register("/f/test/is_big", lambda n: n > 2, kind="predicate")
+    register("/f/test/not_pred", lambda n: n, kind="metric")
+    register("/f/test/untyped", lambda n: n > 1)
     path = write("a.yaml", """
 flow:
   seed: {uri: /a/b/c, outputs: [n]}
@@ -288,8 +288,8 @@ flow:
 
 
 def test_builder_field_must_be_a_builder(write):
-    lego("/builder/test/real", lambda graph: graph, kind="builder")
-    lego("/builder/test/fake", lambda graph: graph, kind="layer")
+    register("/builder/test/real", lambda graph: graph, kind="builder")
+    register("/builder/test/fake", lambda graph: graph, kind="layer")
     path = write("a.yaml", """
 blocks:
   chain:
@@ -307,9 +307,9 @@ def test_partial_fact_makes_components_callables(write):
     def scale(value, factor):
         return value * factor
 
-    lego("/f/test/scale", scale, partial=True)
-    lego("/f/test/apply", lambda fn, x: fn(x))
-    lego("/f/test/seven", lambda: 7, returns="x")
+    register("/f/test/scale", scale, partial=True)
+    register("/f/test/apply", lambda fn, x: fn(x))
+    register("/f/test/seven", lambda: 7, returns="x")
     path = write("a.yaml", """
 doubler: {uri: /f/test/scale, params: {factor: 2}}
 flow:
@@ -325,7 +325,7 @@ def test_flow_step_signature_checks(write):
     def work(a, b, c=1):
         return a + b + c
 
-    lego("/f/test/work2", work)
+    register("/f/test/work2", work)
     path = write("a.yaml", """
 flow:
   seed: {uri: /a/b/c, outputs: [a]}
@@ -355,14 +355,14 @@ def test_predicate_bus_facts_reach_tezgah(write):
     def label(n, mode="even"):
         return (n % 2 == 0) if mode == "even" else (n % 2 == 1)
 
-    lego("/f/test/over", over, kind="predicate", bus=["limit", "tag"])
-    lego("/f/test/over_next", over_next, kind="predicate", bus=["limit"])
-    lego("/f/test/label", label, kind="predicate", bus=["mode"])
-    lego("/f/test/seven", lambda: 7, returns="n")
-    lego("/f/test/three", lambda: 3, returns="limit")
-    lego("/f/test/odd", lambda: "odd", returns="mode")
-    lego("/f/test/bump", lambda n: n + 1, returns="n_next")
-    lego("/f/test/shout", lambda n: seen.append("shout"))
+    register("/f/test/over", over, kind="predicate", bus=["limit", "tag"])
+    register("/f/test/over_next", over_next, kind="predicate", bus=["limit"])
+    register("/f/test/label", label, kind="predicate", bus=["mode"])
+    register("/f/test/seven", lambda: 7, returns="n")
+    register("/f/test/three", lambda: 3, returns="limit")
+    register("/f/test/odd", lambda: "odd", returns="mode")
+    register("/f/test/bump", lambda n: n + 1, returns="n_next")
+    register("/f/test/shout", lambda n: seen.append("shout"))
     path = write("a.yaml", """
 flow:
   outputs: [final, picked]

@@ -11,7 +11,7 @@ from .errors import (
     RegistryError,
     Source,
 )
-from .registry import Facts, Registry, declare_kinds, lego, register, register_fragment, register_many
+from .registry import Facts, Registry, declare_kinds, register, register_fragment, register_many
 from .std import register_std
 
 try:
@@ -37,7 +37,6 @@ __all__ = [
     "declare_kinds",
     "flow_dump",
     "layers",
-    "lego",
     "register",
     "register_fragment",
     "register_many",
