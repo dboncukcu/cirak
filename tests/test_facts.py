@@ -13,6 +13,7 @@ def kinds(problems):
 def test_lego_stores_normalized_facts():
     fresh = Registry()
     fresh.declare_kinds("turn")
+    fresh.declare_facts("uses", "needs_grad", "needs_models")
     assert fresh.kinds == ["builder", "predicate", "data", "turn"]
 
     @fresh.register("/turn/test/train", kind="turn", alias=["train", "supervised"],
@@ -30,9 +31,9 @@ def test_lego_stores_normalized_facts():
     assert facts.mutates == ("models",)
     assert facts.state == ("models",)
     assert facts.refs == {"loss": "loss"}
-    assert facts.uses == ("predicts",)
-    assert facts.needs_grad is True
-    assert facts.needs_models == ("net",)
+    assert facts.get("uses") == ["predicts"]
+    assert facts.get("needs_grad") is True
+    assert facts.get("needs_models") == ["net"]
     assert facts.partial is False
     assert fresh.facts("/turn/test/train") is facts
     assert fresh.facts("/never/registered/uri") == Facts()
@@ -43,21 +44,53 @@ def test_lego_stores_normalized_facts():
                                 "uses": ["predicts"], "needs_grad": True, "needs_models": ["net"]}
 
 
-def test_extras_fact_is_stored_without_a_signature_check():
+def test_a_declared_fact_is_stored_as_written_without_a_signature_check():
     fresh = Registry()
     fresh.declare_kinds("turn")
+    fresh.declare_facts("extras")
 
     def turn(models, params, extra):
         return models
 
     fresh.register("/turn/test/alternating", turn, kind="turn", extras=["amp", "grad_clip", "accumulate"])
     facts = fresh.facts("/turn/test/alternating")
-    assert facts.extras == ("amp", "grad_clip", "accumulate")
+    assert facts.get("extras") == ["amp", "grad_clip", "accumulate"]
     assert facts.declared()["extras"] == ["amp", "grad_clip", "accumulate"]
     fresh.register("/turn/test/one", turn, kind="turn", extras="amp")
-    assert fresh.facts("/turn/test/one").extras == ("amp",)
-    with pytest.raises(RegistryError, match="extras must be a string or a list"):
-        fresh.register("/turn/test/bad", turn, kind="turn", extras=3)
+    assert fresh.facts("/turn/test/one").get("extras") == "amp"
+
+
+def test_a_catalog_declares_facts_of_its_own():
+    fresh = Registry()
+    fresh.declare_kinds("pre")
+    fresh.declare_facts("grouped", "grouped")
+
+    def scaler():
+        return None
+
+    assert fresh.declared_facts == ["grouped"]
+    fresh.register("/pre/test/standard", scaler, kind="pre", grouped=True)
+    facts = fresh.facts("/pre/test/standard")
+    assert facts.get("grouped") is True and facts.extra == {"grouped": True}
+    assert facts.declared()["grouped"] is True
+    assert facts.get("partial") is False and facts.get("nothing", "default") == "default"
+    fresh.register("/pre/test/each", scaler, kind="pre")
+    assert fresh.facts("/pre/test/each").get("grouped", False) is False
+    assert "grouped" not in fresh.facts("/pre/test/each").declared()
+
+
+def test_an_undeclared_fact_is_still_an_error():
+    fresh = Registry()
+    fresh.declare_kinds("pre")
+    with pytest.raises(RegistryError, match="unknown facts \\['gruoped'\\]"):
+        fresh.register("/pre/test/typo", lambda: None, kind="pre", gruoped=True)
+    fresh.declare_facts("grouped")
+    with pytest.raises(RegistryError, match="add yours with declare_facts"):
+        fresh.register("/pre/test/typo", lambda: None, kind="pre", gruoped=True)
+    with pytest.raises(RegistryError, match="one of çırak's own facts"):
+        fresh.declare_facts("alias")
+    with pytest.raises(RegistryError, match="fact names must be strings"):
+        fresh.declare_facts(3)
 
 
 def test_returns_none_differs_from_no_returns_fact():

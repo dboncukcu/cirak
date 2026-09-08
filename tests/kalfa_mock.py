@@ -4,7 +4,7 @@ kalfa registers with its own ``@kalfa.lego``, which derives the kind from the fi
 ``lego`` below does the same over cirak's ``register(kind=...)``, so a URI and its kind never drift apart.
 """
 
-from cirak import declare_kinds, register
+from cirak import declare_facts, declare_kinds, register
 from cirak.registry import registry
 
 KINDS = ("source", "split", "pre", "feed", "loader", "layer", "init", "criterion", "objective", "metric",
@@ -128,6 +128,7 @@ def _training():
     lego("/schedule/kalfa/warmup_cosine", lambda step, warmup, total: 1.0, partial=True, alias="warmup_cosine")
     lego("/schedule/kalfa/linear_betas", lambda step, steps: 0.0, partial=True, alias="linear_betas")
 
+    declare_facts("uses", "needs_grad", "needs_models", "extras", "grouped")
     lego("/lego/kalfa/const", lambda value: value)
     lego("/lego/kalfa/merge", merge)
     lego("/lego/kalfa/identity", lambda value: value, aliases="value")

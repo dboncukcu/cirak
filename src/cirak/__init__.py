@@ -11,7 +11,8 @@ from .errors import (
     RegistryError,
     Source,
 )
-from .registry import Facts, Registry, declare_kinds, register, register_fragment, register_many
+from .registry import (Facts, Registry, declare_facts, declare_kinds, register, register_fragment,
+                       register_many)
 from .std import register_std
 
 try:
@@ -34,6 +35,7 @@ __all__ = [
     "Source",
     "__version__",
     "check",
+    "declare_facts",
     "declare_kinds",
     "flow_dump",
     "layers",

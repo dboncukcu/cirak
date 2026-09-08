@@ -234,9 +234,9 @@ A fact is a fixed statement about a function: what it returns, which parameters 
 | `partial` | bool | the component is not called at build time, the callable itself (with its params attached) is the component | |
 | `state` | `True` or list | which parts of the return value are persistent state; stored, not interpreted | list names in `returns` |
 | `refs` | mapping | parameters whose string values are references of the given type; stored for catalogs, çırak checks the names exist | names in the signature |
-| `uses`, `needs_grad`, `needs_models`, `extras` | list, bool, list, list | stored for catalogs, not interpreted (`extras`: the extra parameters a `turn` lego accepts) | shapes |
+| a fact the catalog declared | anything | stored as written, never interpreted; `Facts.get(name)` reads it and `Facts.declared()` lists it (kalfa declares `uses`, `needs_grad`, `needs_models`, `extras`, `grouped` this way) | the name is declared |
 
-çırak owns three kinds, the ones its own rules read: `builder`, `predicate` and `data`. A catalog declares the rest before registering its legos (`cirak.declare_kinds("layer", "metric", "turn")`; additive, idempotent), and a lego whose `kind` was never declared is a `RegistryError`. `Registry.kinds` lists what is declared, `Registry.facts(uri)` returns a `Facts` object for any URI (an empty one for unknown URIs), and `Facts.declared()` lists what a lego actually declared.
+çırak owns three kinds, the ones its own rules read: `builder`, `predicate` and `data`. A catalog declares the rest before registering its legos (`cirak.declare_kinds("layer", "metric", "turn")`; additive, idempotent), and a lego whose `kind` was never declared is a `RegistryError`. Facts follow the same rule: the table above is what çırak reads, and a catalog adds its own vocabulary with `cirak.declare_facts("grouped")` before registering (additive, idempotent, a çırak fact name is refused). A declared fact goes into `Facts.extra` untouched, `Facts.get("grouped")` reads it and `Facts.declared()` lists it for catalogs and listings; an undeclared name stays a `RegistryError`, so a misspelled fact is still caught. `Registry.kinds` lists what is declared, `Registry.facts(uri)` returns a `Facts` object for any URI (an empty one for unknown URIs), and `Facts.declared()` lists what a lego actually declared.
 
 Where facts act:
 

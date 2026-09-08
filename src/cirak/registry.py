@@ -9,8 +9,7 @@ URI_PATTERN = re.compile(r"^(/[a-z0-9_]+){3,}$")
 
 OWN_KINDS = ("builder", "predicate", "data")
 
-FACT_NAMES = ("kind", "alias", "returns", "bus", "mutates", "aliases", "partial", "state",
-              "refs", "uses", "needs_grad", "needs_models", "extras")
+FACT_NAMES = ("kind", "alias", "returns", "bus", "mutates", "aliases", "partial", "state", "refs")
 
 
 class _Unset:
@@ -38,13 +37,16 @@ class Facts:
     partial: bool = False
     state: object = False
     refs: dict = field(default_factory=dict)
-    uses: tuple[str, ...] = ()
-    needs_grad: bool | None = None
-    needs_models: tuple[str, ...] = ()
-    extras: tuple[str, ...] = ()
+    extra: dict = field(default_factory=dict)
+
+    def get(self, name, default=None):
+        """A fact by name: one of çırak's own, or one the catalog declared with ``declare_facts``."""
+        if name in FACT_NAMES:
+            return getattr(self, name)
+        return self.extra.get(name, default)
 
     def declared(self) -> dict:
-        """The facts that differ from the empty declaration, for listings."""
+        """The facts that differ from the empty declaration, çırak's own and the catalog's, for listings."""
         found = {}
         for name in FACT_NAMES:
             value = getattr(self, name)
@@ -52,6 +54,9 @@ class Facts:
                 if value is not UNSET:
                     found[name] = value
             elif value not in (None, (), {}, False):
+                found[name] = list(value) if isinstance(value, tuple) else value
+        for name, value in self.extra.items():
+            if value not in (None, (), {}, False):
                 found[name] = list(value) if isinstance(value, tuple) else value
         return found
 
@@ -85,10 +90,11 @@ def _names(value, uri, fact):
     raise RegistryError(f"{uri}: {fact} must be a string or a list of strings, got {value!r}")
 
 
-def _normalize_facts(uri, facts) -> Facts:
-    unknown = [name for name in facts if name not in FACT_NAMES]
+def _normalize_facts(uri, facts, declared=()) -> Facts:
+    unknown = [name for name in facts if name not in FACT_NAMES and name not in declared]
     if unknown:
-        raise RegistryError(f"{uri}: unknown facts {unknown}; known facts are {list(FACT_NAMES)}")
+        raise RegistryError(f"{uri}: unknown facts {unknown}; çırak's facts are {list(FACT_NAMES)}, the catalog "
+                            f"declared {list(declared)}, add yours with declare_facts()")
     kind = facts.get("kind")
     if kind is not None and not isinstance(kind, str):
         raise RegistryError(f"{uri}: kind must be a string")
@@ -128,14 +134,8 @@ def _normalize_facts(uri, facts) -> Facts:
     if not isinstance(refs, dict) or not all(isinstance(key, str) and isinstance(value, str)
                                              for key, value in refs.items()):
         raise RegistryError(f"{uri}: refs must map parameter names to type names")
-    uses = _names(facts["uses"], uri, "uses") if facts.get("uses") else ()
-    needs_grad = facts.get("needs_grad")
-    if needs_grad is not None and not isinstance(needs_grad, bool):
-        raise RegistryError(f"{uri}: needs_grad must be a boolean")
-    needs_models = _names(facts["needs_models"], uri, "needs_models") if facts.get("needs_models") else ()
-    extras = _names(facts["extras"], uri, "extras") if facts.get("extras") else ()
-    return Facts(kind, alias, returns, bus, mutates, aliases, partial, state, dict(refs), uses,
-                 needs_grad, needs_models, extras)
+    extra = {name: value for name, value in facts.items() if name in declared}
+    return Facts(kind, alias, returns, bus, mutates, aliases, partial, state, dict(refs), extra)
 
 
 def _check_against_signature(uri, target, facts: Facts) -> None:
@@ -165,7 +165,9 @@ class Registry:
 
     çırak owns three kinds (``builder``, ``predicate`` and ``data``); a catalog
     declares its own with ``declare_kinds`` and every lego's ``kind`` must be a
-    declared one.
+    declared one. Facts work the same way: çırak owns ``FACT_NAMES`` and reads
+    them, a catalog declares its own with ``declare_facts`` and çırak stores them
+    for listings without interpreting them.
     """
 
     def __init__(self):
@@ -173,6 +175,7 @@ class Registry:
         self._resolved: dict[str, object] = {}
         self._checked: set[str] = set()
         self._kinds: list[str] = list(OWN_KINDS)
+        self._facts: list[str] = []
 
     def declare_kinds(self, *names) -> None:
         for name in names:
@@ -181,18 +184,34 @@ class Registry:
             if name not in self._kinds:
                 self._kinds.append(name)
 
+    def declare_facts(self, *names) -> None:
+        """Let the catalog register legos with facts of its own; çırak stores them, it reads none of them."""
+        for name in names:
+            if not isinstance(name, str) or not name:
+                raise RegistryError(f"fact names must be strings, got {name!r}")
+            if name in FACT_NAMES:
+                raise RegistryError(f"{name!r} is one of çırak's own facts, it needs no declaration")
+            if name not in self._facts:
+                self._facts.append(name)
+
     @property
     def kinds(self) -> list[str]:
         return list(self._kinds)
+
+    @property
+    def declared_facts(self) -> list[str]:
+        return list(self._facts)
 
     def register(self, uri, target=None, *, description=None, **facts):
         """Register ``target`` under ``uri`` with the facts it declares, or return a decorator."""
         if target is None:
             def decorator(fn):
-                self._add(Entry(uri, fn, _describe(fn, description), facts=_normalize_facts(uri, facts)))
+                self._add(Entry(uri, fn, _describe(fn, description),
+                                facts=_normalize_facts(uri, facts, self._facts)))
                 return fn
             return decorator
-        self._add(Entry(uri, target, _describe(target, description), facts=_normalize_facts(uri, facts)))
+        self._add(Entry(uri, target, _describe(target, description),
+                        facts=_normalize_facts(uri, facts, self._facts)))
         return target
 
     def register_many(self, prefix, entries) -> None:
@@ -301,6 +320,10 @@ def register(uri, target=None, *, description=None, **facts):
 
 def declare_kinds(*names) -> None:
     registry.declare_kinds(*names)
+
+
+def declare_facts(*names) -> None:
+    registry.declare_facts(*names)
 
 
 def register_many(prefix, entries) -> None:
